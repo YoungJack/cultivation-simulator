@@ -63,11 +63,11 @@ export default function DashboardPage() {
   const [isBreakingThrough, setIsBreakingThrough] = useState(false);
   const [canBreak, setCanBreak] = useState(false);
   const [encounter, setEncounter] = useState<{
+    eventId: string;
     title: string;
     narrative: string;
-    choices: { text: string; risk: "low" | "medium" | "high"; hint: string }[];
+    choices: { riskLevel: string; text: string; hint: string }[];
   } | null>(null);
-  const [isExploring, setIsExploring] = useState(false);
   const [encounterResult, setEncounterResult] = useState<string | null>(null);
 
   // 加载用户数据
@@ -168,30 +168,26 @@ export default function DashboardPage() {
       // 生成叙事
       await generateNarrative(data.cultivator, taskId);
 
-      // 15% 概率触发随机奇遇
-      if (Math.random() < 0.15) {
-        setTimeout(async () => {
-          try {
-            const encRes = await fetch("/api/narrative", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ userId, type: "ENCOUNTER" }),
+      // 随机触发奇遇（概率由 API 控制：30% + 每日上限3次）
+      setTimeout(async () => {
+        try {
+          const encRes = await fetch(`/api/encounter?userId=${userId}`);
+          const encData = await encRes.json();
+          if (encData.triggered && encData.encounter) {
+            setEncounter({
+              eventId: encData.eventId,
+              title: encData.encounter.title,
+              narrative: encData.encounter.narrative,
+              choices: encData.encounter.choices,
             });
-            const encData = await encRes.json();
-            if (encData.narrative && !encData.error) {
-              setEncounter(encData.narrative);
-              if (encData.event) {
-                setEvents((prev) => [encData.event, ...prev]);
-              }
-              toast("⚡ 修炼途中遇到了奇遇！", {
-                description: encData.narrative.title,
-              });
-            }
-          } catch {
-            // 静默失败，不打断用户
+            toast("⚡ 修炼途中遇到了奇遇！", {
+              description: encData.encounter.title,
+            });
           }
-        }, 2000);
-      }
+        } catch {
+          // 静默失败
+        }
+      }, 2000);
     } catch {
       toast.error("操作失败");
     }
@@ -287,17 +283,11 @@ export default function DashboardPage() {
 
   // 奇遇探索
   const triggerEncounter = async () => {
-    setIsExploring(true);
     setEncounter(null);
     setEncounterResult(null);
 
     try {
-      const res = await fetch("/api/narrative", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, type: "ENCOUNTER" }),
-      });
-
+      const res = await fetch(`/api/encounter?userId=${userId}`);
       const data = await res.json();
 
       if (data.error) {
@@ -305,17 +295,19 @@ export default function DashboardPage() {
         return;
       }
 
-      if (data.narrative) {
-        setEncounter(data.narrative);
-      }
-
-      if (data.event) {
-        setEvents((prev) => [data.event, ...prev]);
+      if (data.triggered && data.encounter) {
+        setEncounter({
+          eventId: data.eventId,
+          title: data.encounter.title,
+          narrative: data.encounter.narrative,
+          choices: data.encounter.choices,
+        });
+        toast.success("⚡ 感应到机缘！");
+      } else {
+        toast.info("天地之间暂时平静，未感应到机缘。继续修炼吧。");
       }
     } catch {
       toast.error("探索失败，请重试");
-    } finally {
-      setIsExploring(false);
     }
   };
 
@@ -324,10 +316,10 @@ export default function DashboardPage() {
     if (!encounter) return;
 
     try {
-      const res = await fetch("/api/narrative", {
+      const res = await fetch("/api/encounter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, type: "ENCOUNTER", choiceIndex }),
+        body: JSON.stringify({ eventId: encounter.eventId, userId, choiceIndex }),
       });
 
       const data = await res.json();
@@ -337,14 +329,27 @@ export default function DashboardPage() {
         return;
       }
 
-      const choice = encounter.choices[choiceIndex];
-      setEncounterResult(
-        `你选择了「${choice.text}」——修炼值 +${data.expBonus}！${choice.hint}`
-      );
+      // 构建结果文本
+      const lines: string[] = [];
+      lines.push(data.message);
+      if (data.outcomeMessage) {
+        lines.push(data.outcomeMessage);
+      }
+
+      setEncounterResult(lines.join("。"));
 
       // 刷新修炼值
       if (data.cultivator) {
-        setCultivator(data.cultivator);
+        setCultivator((prev) =>
+          prev
+            ? {
+                ...prev,
+                cultivationExp: data.cultivator.cultivationExp,
+                totalExp: data.cultivator.totalExp,
+                stamina: data.cultivator.stamina,
+              }
+            : prev
+        );
       }
     } catch {
       toast.error("选择失败");
@@ -587,16 +592,9 @@ export default function DashboardPage() {
               <Button
                 className="bg-gradient-to-r from-purple-700 to-violet-700 hover:from-purple-600 hover:to-violet-600"
                 onClick={triggerEncounter}
-                disabled={isExploring}
               >
-                {isExploring ? (
-                  <>正在感应天地灵气...</>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    外出探索
-                  </>
-                )}
+                <Sparkles className="w-4 h-4 mr-2" />
+                外出探索
               </Button>
             </div>
           )}
@@ -617,16 +615,16 @@ export default function DashboardPage() {
                   <button
                     key={i}
                     className={`w-full text-left p-2.5 rounded-lg border text-sm transition-all hover:scale-[1.02] ${
-                      choice.risk === "high"
+                      choice.riskLevel === "high"
                         ? "border-red-800/50 bg-red-950/20 hover:bg-red-950/40 text-red-300"
-                        : choice.risk === "medium"
+                        : choice.riskLevel === "medium"
                         ? "border-yellow-800/50 bg-yellow-950/20 hover:bg-yellow-950/40 text-yellow-300"
                         : "border-green-800/50 bg-green-950/20 hover:bg-green-950/40 text-green-300"
                     }`}
                     onClick={() => chooseEncounter(i)}
                   >
                     <span className="text-xs opacity-70">
-                      {choice.risk === "high" ? "⚠ 高风险" : choice.risk === "medium" ? "⚡ 中风险" : "🍃 低风险"}
+                      {choice.riskLevel === "high" ? "⚠ 高风险" : choice.riskLevel === "medium" ? "⚡ 中风险" : "🍃 低风险"}
                     </span>
                     <span className="ml-2">{choice.text}</span>
                   </button>
