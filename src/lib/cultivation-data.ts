@@ -419,3 +419,36 @@ export function performBreakthrough(
     newExp: cultivationExp - required,
   };
 }
+
+/**
+ * 扣减修炼值，不足以扣除时跌落「小境界」（同一大境界内的层数）。
+ *
+ * 规则：
+ * - 修炼值不够扣 → 逐层下跌，把欠下的部分从下一层的修炼值里借（结余为该层突破所需 − 欠值）。
+ * - 只在「同一大境界」内跌落，绝不跌回上一个大境界。
+ * - 跌到本境界最低层（如炼气第一层 / 筑基初期）仍不够扣 → 修炼值归零，不出现负数。
+ *
+ * @param loss 扣减量（传正数）
+ */
+export function applyExpLoss(
+  realmName: string,
+  realmLevel: number,
+  cultivationExp: number,
+  loss: number
+): { realm: string; realmLevel: number; cultivationExp: number; levelsDropped: number } {
+  let level = realmLevel;
+  let exp = cultivationExp - Math.abs(loss);
+  let levelsDropped = 0;
+
+  // 修炼值为负且还能下跌（层数 > 1）→ 跌一层，把欠值并入下一层的修炼条
+  while (exp < 0 && level > 1) {
+    level -= 1;
+    levelsDropped += 1;
+    exp += getRequiredExp(realmName, level);
+  }
+
+  // 已在本大境界最低层仍为负 → 归零，不跌大境界、不出现负数
+  if (exp < 0) exp = 0;
+
+  return { realm: realmName, realmLevel: level, cultivationExp: exp, levelsDropped };
+}

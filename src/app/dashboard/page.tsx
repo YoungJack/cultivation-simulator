@@ -85,6 +85,28 @@ export default function DashboardPage() {
     setManualClicksToday(stored ? parseInt(stored, 10) : 0);
   }, []);
 
+  // 跨页持久化：从 localStorage 恢复未处理的奇遇状态（切页面回来不丢失）
+  useEffect(() => {
+    const raw = localStorage.getItem("encounter_state");
+    if (!raw) return;
+    try {
+      const { encounter: enc, encounterResult: res } = JSON.parse(raw);
+      if (enc?.eventId) {
+        setEncounter(enc);
+        if (res) setEncounterResult(res);
+      }
+    } catch { /* ignore */ }
+  }, []); // 仅挂载时执行一次
+
+  // 奇遇状态变化时同步到 localStorage，清空时删除 key
+  useEffect(() => {
+    if (encounter) {
+      localStorage.setItem("encounter_state", JSON.stringify({ encounter, encounterResult }));
+    } else {
+      localStorage.removeItem("encounter_state");
+    }
+  }, [encounter, encounterResult]);
+
   const incrementManualClicks = () => {
     const key = getManualClickKey();
     const newCount = manualClicksToday + 1;
@@ -221,6 +243,7 @@ export default function DashboardPage() {
           const encRes = await fetch(`/api/encounter?userId=${userId}`);
           const encData = await encRes.json();
           if (encData.triggered && encData.encounter) {
+            setEncounterResult(null); // 清掉上一次残留结果，避免新奇遇被旧结果挡住
             setEncounter({
               eventId: encData.eventId,
               title: encData.encounter.title,
@@ -422,18 +445,35 @@ export default function DashboardPage() {
 
       setEncounterResult(lines.join("。"));
 
-      // 刷新修炼值
+      // 刷新修炼值 / 境界（高风险失败可能跌落小境界）
       if (data.cultivator) {
         setCultivator((prev) =>
           prev
             ? {
                 ...prev,
+                realm: data.cultivator.realm ?? prev.realm,
+                realmLevel: data.cultivator.realmLevel ?? prev.realmLevel,
                 cultivationExp: data.cultivator.cultivationExp,
                 totalExp: data.cultivator.totalExp,
                 stamina: data.cultivator.stamina,
               }
             : prev
         );
+
+        // 修炼值/境界变化后重新判断能否突破
+        const { canBreakthrough } = await import("@/lib");
+        setCanBreak(
+          canBreakthrough(
+            data.cultivator.realm,
+            data.cultivator.realmLevel,
+            data.cultivator.cultivationExp,
+            cultivator!.spiritualRoot
+          )
+        );
+
+        if (data.levelsDropped > 0) {
+          toast.error("⚡ 修为倒退，境界跌落！");
+        }
       }
     } catch {
       toast.error("选择失败");
@@ -598,11 +638,13 @@ export default function DashboardPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
-          {/* 有未处理奇遇时提示，防止再次触发覆盖 */}
-          {encounter && !encounterResult && (
+          {/* 有未收尾奇遇时提示，防止再次触发覆盖、错过新奇遇 */}
+          {encounter && (
             <div className="flex items-center gap-2 rounded-lg bg-purple-950/40 border border-purple-800/40 px-3 py-2 text-xs text-purple-300">
               <Sparkles className="w-3.5 h-3.5 shrink-0 text-purple-400" />
-              请先处理下方奇遇，再继续修炼
+              {encounterResult
+                ? "请先点击下方「继续修炼」收尾，再开始新的修炼"
+                : "请先处理下方奇遇，再继续修炼"}
             </div>
           )}
 
@@ -634,7 +676,7 @@ export default function DashboardPage() {
                   size="sm"
                   className="bg-amber-700 hover:bg-amber-600 h-8 px-3 text-xs shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                   onClick={() => completeTask(task.id)}
-                  disabled={!!(encounter && !encounterResult)}
+                  disabled={!!encounter}
                 >
                   完成
                 </Button>
@@ -658,7 +700,7 @@ export default function DashboardPage() {
             {Object.entries(TASK_TYPES).map(([key, taskType]) => {
               const atLimit  = tasks.filter(t => t.type === key && t.completed).length >= taskType.dailyMax;
               const pending  = tasks.some(t => t.type === key && !t.completed);
-              const encounterPending = !!(encounter && !encounterResult);
+              const encounterPending = !!encounter;
               return (
                 <Button
                   key={key}

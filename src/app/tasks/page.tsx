@@ -35,6 +35,17 @@ export default function TasksPage() {
   const [userId, setUserId]     = useState("");
   const [spiritualRoot, setSpiritualRoot] = useState<SpiritualRoot>("杂灵根");
   const [isLoading, setIsLoading] = useState(true);
+  const [encounterPending, setEncounterPending] = useState(false);
+
+  // 检查是否有跨页持久化的待处理奇遇
+  useEffect(() => {
+    const raw = localStorage.getItem("encounter_state");
+    if (!raw) return;
+    try {
+      const { encounter: enc } = JSON.parse(raw);
+      if (enc?.eventId) setEncounterPending(true);
+    } catch { /* ignore */ }
+  }, []);
 
   const load = useCallback(async () => {
     const id = localStorage.getItem("userId");
@@ -115,6 +126,22 @@ export default function TasksPage() {
         </p>
       </div>
 
+      {/* 奇遇拦截提示 */}
+      {encounterPending && (
+        <div className="flex items-center justify-between gap-3 rounded-xl bg-purple-950/40 border border-purple-800/40 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-purple-300">
+            <Sparkles className="w-4 h-4 shrink-0 text-purple-400" />
+            <span>有奇遇待处理，请先回修炼面板处理</span>
+          </div>
+          <button
+            className="text-xs text-purple-400 hover:text-purple-200 border border-purple-700/50 rounded-lg px-3 py-1.5 shrink-0"
+            onClick={() => router.push("/dashboard")}
+          >
+            去处理 →
+          </button>
+        </div>
+      )}
+
       {/* 添加任务 */}
       <Card className="bg-stone-800 border-white/10">
         <CardHeader className="pb-2">
@@ -131,9 +158,9 @@ export default function TasksPage() {
                   key={key}
                   variant="outline"
                   size="sm"
-                  className={`border-white/10 text-white hover:border-amber-700 hover:text-amber-400 h-10 px-3 ${atLimit ? "opacity-40 cursor-not-allowed" : ""}`}
+                  className={`border-white/10 text-white hover:border-amber-700 hover:text-amber-400 h-10 px-3 ${(atLimit || encounterPending) ? "opacity-40 cursor-not-allowed" : ""}`}
                   onClick={() => createTask(key)}
-                  disabled={pending || atLimit}
+                  disabled={pending || atLimit || encounterPending}
                 >
                   {taskType.icon} <span className="ml-1">{taskType.name}</span>
                   {atLimit && <span className="ml-1 text-xs opacity-70">满</span>}
@@ -162,8 +189,9 @@ export default function TasksPage() {
                 </div>
                 <Button
                   size="sm"
-                  className="bg-amber-700 hover:bg-amber-600 h-9 px-4 shrink-0"
+                  className="bg-amber-700 hover:bg-amber-600 h-9 px-4 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                   onClick={() => completeTask(task.id)}
+                  disabled={encounterPending}
                 >
                   完成
                 </Button>

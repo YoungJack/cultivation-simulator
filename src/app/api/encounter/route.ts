@@ -8,7 +8,7 @@ import {
   resolveHighRiskOutcome,
   applyRewardEffects,
 } from "@/lib/encounter-data";
-import { REALMS } from "@/lib/cultivation-data";
+import { REALMS, formatRealmLevel } from "@/lib/cultivation-data";
 
 // ============================================================
 // GET — 尝试触发奇遇（在完成任务后调用 或 手动探索）
@@ -200,18 +200,29 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 应用奖励效果
+    // 应用奖励效果（修炼值不足扣除时会跌落小境界）
     const result = applyRewardEffects(rewards, {
+      realm: cultivator.realm,
+      realmLevel: cultivator.realmLevel,
       cultivationExp: cultivator.cultivationExp,
       totalExp: cultivator.totalExp,
       stamina: cultivator.stamina,
     });
+
+    // 跌落境界提示
+    if (result.levelsDropped > 0) {
+      outcomeMessage =
+        (outcomeMessage ? outcomeMessage + " " : "") +
+        `经此一劫，修为倒退，跌回${result.realm}${formatRealmLevel(result.realm, result.realmLevel)}`;
+    }
 
     // 更新修炼者状态
     const [updatedCultivator, updatedEvent] = await prisma.$transaction([
       prisma.cultivator.update({
         where: { id: cultivator.id },
         data: {
+          realm: result.realm,
+          realmLevel: result.realmLevel,
           cultivationExp: result.cultivationExp,
           totalExp: result.totalExp,
           stamina: result.stamina,
@@ -240,7 +251,10 @@ export async function POST(request: NextRequest) {
       message: result.message,
       outcomeMessage: outcomeMessage || undefined,
       narrative: choice.successNarrative,
+      levelsDropped: result.levelsDropped,
       cultivator: {
+        realm: updatedCultivator.realm,
+        realmLevel: updatedCultivator.realmLevel,
         cultivationExp: updatedCultivator.cultivationExp,
         totalExp: updatedCultivator.totalExp,
         stamina: updatedCultivator.stamina,

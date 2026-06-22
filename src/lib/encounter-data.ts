@@ -3,7 +3,7 @@
 // ============================================================
 
 import type { SpiritualRoot } from "./cultivation-data";
-import { SPIRITUAL_ROOTS } from "./cultivation-data";
+import { SPIRITUAL_ROOTS, applyExpLoss } from "./cultivation-data";
 
 // ============================================================
 // 类型定义
@@ -66,7 +66,7 @@ export const ENCOUNTER_POOL: Encounter[] = [
         text: "在洞外盘坐吐纳，吸纳逸散灵气",
         hint: "安全无忧，可稳定获取少量修为",
         rewards: [
-          { type: "cultivationExp", value: 30, label: "+30 修炼值" },
+          { type: "cultivationExp", value: 25, label: "+25 修炼值" },
         ],
         successNarrative:
           "你在洞府外寻了一处灵气最浓之地，盘膝坐下，闭目运功。丝丝缕缕的精纯灵气自洞中溢出，顺毛孔渗入经脉。一日一夜后，你睁开双眼，只觉体内灵力充盈，修为略有精进。虽未踏入洞府，却也小有收获。",
@@ -76,7 +76,7 @@ export const ENCOUNTER_POOL: Encounter[] = [
         text: "谨慎破解外围禁制，探索洞府外围",
         hint: "需要运功破解，有中等概率获得功法残卷",
         rewards: [
-          { type: "cultivationExp", value: 80, label: "+80 修炼值" },
+          { type: "cultivationExp", value: 60, label: "+60 修炼值" },
           { type: "specialItem", value: 1, label: "获得「青云心法·残卷」" },
         ],
         successNarrative:
@@ -87,7 +87,7 @@ export const ENCOUNTER_POOL: Encounter[] = [
         text: "催动浑身灵力，硬闯核心禁制！",
         hint: "⚠️ 有概率触发反噬损失修为，但若成功可得法宝",
         rewards: [
-          { type: "cultivationExp", value: 200, label: "+200 修炼值" },
+          { type: "cultivationExp", value: 130, label: "+130 修炼值" },
           { type: "specialItem", value: 1, label: "获得「青冥剑·下品法宝」" },
         ],
         successNarrative:
@@ -111,7 +111,7 @@ export const ENCOUNTER_POOL: Encounter[] = [
         text: "远远观望，静心感悟天劫中蕴含的大道法则",
         hint: "零风险，通过观摩天劫获得悟道感悟",
         rewards: [
-          { type: "cultivationExp", value: 50, label: "+50 修炼值" },
+          { type: "cultivationExp", value: 20, label: "+20 修炼值" },
         ],
         successNarrative:
           "你寻了一处安全的高地，盘膝坐下，凝神观望天劫——雷光电蛇的每一道弧线都暗合天道法则，毁灭之中蕴含着创生之力。数个时辰后劫云散去，你从入定中醒来，心中对天道的感悟又深了一层。",
@@ -121,7 +121,7 @@ export const ENCOUNTER_POOL: Encounter[] = [
         text: "掷出护身法器，远程助灵狐挡一道雷劫",
         hint: "消耗一件法器，有机会获得灵兽感恩馈赠",
         rewards: [
-          { type: "cultivationExp", value: 100, label: "+100 修炼值" },
+          { type: "cultivationExp", value: 55, label: "+55 修炼值" },
           { type: "specialItem", value: 1, label: "获得「灵狐之泪·炼丹圣品」" },
         ],
         successNarrative:
@@ -132,7 +132,7 @@ export const ENCOUNTER_POOL: Encounter[] = [
         text: "冲入雷劫范围，以自身修为为灵狐扛劫！",
         hint: "⚠️ 高概率损失修为，但若成功灵狐可能认主",
         rewards: [
-          { type: "cultivationExp", value: 300, label: "+300 修炼值" },
+          { type: "cultivationExp", value: 120, label: "+120 修炼值" },
           { type: "specialItem", value: 1, label: "「五尾灵狐」认你为主！" },
         ],
         successNarrative:
@@ -156,7 +156,7 @@ export const ENCOUNTER_POOL: Encounter[] = [
         text: "果断捏碎传送符，撤离此地",
         hint: "安全撤离，但失去此处可能的机缘",
         rewards: [
-          { type: "cultivationExp", value: 20, label: "+20 修炼值" },
+          { type: "cultivationExp", value: 18, label: "+18 修炼值" },
         ],
         successNarrative:
           "你毫不犹豫从袖中取出一枚传送符，啪地捏碎。白光闪过，身形瞬间消失在原地。邪修的禁制扑了个空，黑袍老者怒骂一声，却也无可奈何。你出现在数十里外的一处安全之地，虽有些狼狈，但总比落入圈套强。",
@@ -166,7 +166,7 @@ export const ENCOUNTER_POOL: Encounter[] = [
         text: "以游斗之策周旋，边战边寻找阵眼破绽",
         hint: "智取为上，有概率击败邪修获取战利品",
         rewards: [
-          { type: "cultivationExp", value: 120, label: "+120 修炼值" },
+          { type: "cultivationExp", value: 50, label: "+50 修炼值" },
           { type: "specialItem", value: 1, label: "缴获「骷髅杖·下品法器」" },
         ],
         successNarrative:
@@ -177,7 +177,7 @@ export const ENCOUNTER_POOL: Encounter[] = [
         text: "燃血秘术，硬撼三名邪修的合击阵法！",
         hint: "⚠️ 极大风险！可能大胜获重宝，也可能修为倒退",
         rewards: [
-          { type: "cultivationExp", value: 350, label: "+350 修炼值" },
+          { type: "cultivationExp", value: 110, label: "+110 修炼值" },
           { type: "specialItem", value: 1, label: "夺得「黑煞炼魂旗·中品法宝」" },
         ],
         successNarrative:
@@ -265,26 +265,37 @@ export function resolveHighRiskOutcome(
 /**
  * 应用奖励效果到修炼者状态
  * 返回新的状态值（用于数据库更新）
+ *
+ * 修炼值为正 → 正常累加；为负（高风险失败的反噬）→ 走跌落境界逻辑：
+ * 不够扣则跌「小境界」（同一大境界内层数），跌到本境界最低层归零，绝不出现负数、不跌大境界。
  */
 export function applyRewardEffects(
   effects: RewardEffect[],
   currentState: {
+    realm: string;
+    realmLevel: number;
     cultivationExp: number;
     totalExp: number;
     stamina: number;
   }
 ): {
   cultivationExpDelta: number;
+  realm: string;
+  realmLevel: number;
   cultivationExp: number;
   totalExp: number;
   stamina: number;
   specialItems: string[];
+  levelsDropped: number;
   message: string;
 } {
   let expDelta = 0;
+  let realm = currentState.realm;
+  let realmLevel = currentState.realmLevel;
   let totalExp = currentState.totalExp;
   let cultivationExp = currentState.cultivationExp;
   let stamina = currentState.stamina;
+  let levelsDropped = 0;
   const specialItems: string[] = [];
   const messageParts: string[] = [];
 
@@ -292,8 +303,18 @@ export function applyRewardEffects(
     switch (effect.type) {
       case "cultivationExp":
         expDelta += effect.value;
-        cultivationExp = Math.max(0, cultivationExp + effect.value);
-        totalExp = Math.max(0, totalExp + effect.value);
+        if (effect.value >= 0) {
+          cultivationExp += effect.value;
+          totalExp += effect.value;
+        } else {
+          // 扣减：可能跌落小境界
+          const after = applyExpLoss(realm, realmLevel, cultivationExp, -effect.value);
+          realm = after.realm;
+          realmLevel = after.realmLevel;
+          cultivationExp = after.cultivationExp;
+          levelsDropped += after.levelsDropped;
+          totalExp = Math.max(0, totalExp + effect.value);
+        }
         messageParts.push(effect.label);
         break;
       case "stamina":
@@ -311,10 +332,13 @@ export function applyRewardEffects(
 
   return {
     cultivationExpDelta: expDelta,
+    realm,
+    realmLevel,
     cultivationExp,
     totalExp,
     stamina,
     specialItems,
+    levelsDropped,
     message: messageParts.join("，"),
   };
 }
