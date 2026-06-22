@@ -159,6 +159,11 @@ export default function DashboardPage() {
 
   // 创建任务
   const createTask = async (type: string) => {
+    // 奇遇结果已出、用户选择忽略继续 → 自动归零，不阻断后续奇遇触发
+    if (encounterResult) {
+      setEncounter(null);
+      setEncounterResult(null);
+    }
     try {
       const res = await fetch("/api/tasks", {
         method: "POST",
@@ -179,6 +184,11 @@ export default function DashboardPage() {
 
   // 完成任务
   const completeTask = async (taskId: string) => {
+    // 奇遇结果已出、用户选择忽略继续 → 自动归零，不阻断后续奇遇触发
+    if (encounterResult) {
+      setEncounter(null);
+      setEncounterResult(null);
+    }
     // 乐观更新：找到任务类型，预估修炼值，前端先加上
     const task = tasks.find((t) => t.id === taskId);
     const estimatedExp = task && cultivator
@@ -638,13 +648,11 @@ export default function DashboardPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
-          {/* 有未收尾奇遇时提示，防止再次触发覆盖、错过新奇遇 */}
-          {encounter && (
+          {/* 奇遇待选择时拦截；结果已出则提示可直接继续（系统会自动归零） */}
+          {encounter && !encounterResult && (
             <div className="flex items-center gap-2 rounded-lg bg-purple-950/40 border border-purple-800/40 px-3 py-2 text-xs text-purple-300">
               <Sparkles className="w-3.5 h-3.5 shrink-0 text-purple-400" />
-              {encounterResult
-                ? "请先点击下方「继续修炼」收尾，再开始新的修炼"
-                : "请先处理下方奇遇，再继续修炼"}
+              请先处理下方奇遇，再继续修炼
             </div>
           )}
 
@@ -676,7 +684,7 @@ export default function DashboardPage() {
                   size="sm"
                   className="bg-amber-700 hover:bg-amber-600 h-8 px-3 text-xs shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                   onClick={() => completeTask(task.id)}
-                  disabled={!!encounter}
+                  disabled={!!(encounter && !encounterResult)}
                 >
                   完成
                 </Button>
@@ -700,7 +708,7 @@ export default function DashboardPage() {
             {Object.entries(TASK_TYPES).map(([key, taskType]) => {
               const atLimit  = tasks.filter(t => t.type === key && t.completed).length >= taskType.dailyMax;
               const pending  = tasks.some(t => t.type === key && !t.completed);
-              const encounterPending = !!encounter;
+              const encounterPending = !!(encounter && !encounterResult);
               return (
                 <Button
                   key={key}

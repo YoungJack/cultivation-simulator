@@ -37,13 +37,15 @@ export default function TasksPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [encounterPending, setEncounterPending] = useState(false);
 
-  // 检查是否有跨页持久化的待处理奇遇
+  // 检查是否有跨页持久化的、且尚未选择的奇遇（等待选择才拦截，结果已出放行）
   useEffect(() => {
     const raw = localStorage.getItem("encounter_state");
     if (!raw) return;
     try {
-      const { encounter: enc } = JSON.parse(raw);
-      if (enc?.eventId) setEncounterPending(true);
+      const { encounter: enc, encounterResult: res } = JSON.parse(raw);
+      // 只有奇遇触发且还没做选择时才拦截
+      if (enc?.eventId && !res) setEncounterPending(true);
+      // 如果结果已出（"继续修炼"状态）→ 用户在这里操作时自动归零
     } catch { /* ignore */ }
   }, []);
 
@@ -69,6 +71,14 @@ export default function TasksPage() {
   useEffect(() => { load(); }, [load]);
 
   const createTask = async (type: string) => {
+    // 奇遇结果已出但未归零 → 自动清除，不阻断后续奇遇触发
+    try {
+      const raw = localStorage.getItem("encounter_state");
+      if (raw) {
+        const { encounterResult: res } = JSON.parse(raw);
+        if (res) localStorage.removeItem("encounter_state");
+      }
+    } catch { /* ignore */ }
     const res  = await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -84,6 +94,14 @@ export default function TasksPage() {
   };
 
   const completeTask = async (taskId: string) => {
+    // 奇遇结果已出但未归零 → 自动清除，不阻断后续奇遇触发
+    try {
+      const raw = localStorage.getItem("encounter_state");
+      if (raw) {
+        const { encounterResult: res } = JSON.parse(raw);
+        if (res) localStorage.removeItem("encounter_state");
+      }
+    } catch { /* ignore */ }
     const task = tasks.find(t => t.id === taskId);
     const est  = task ? calculateTaskExp(task.type, spiritualRoot) : 0;
 
